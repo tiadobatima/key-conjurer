@@ -22,6 +22,7 @@ var (
 	FlagTimeToLive    = "ttl"
 	FlagBypassCache   = "bypass-cache"
 	FlagLogin         = "login"
+	FlagProfileName   = "profile"
 )
 
 var (
@@ -47,6 +48,7 @@ func init() {
 	getCmd.Flags().String(FlagAWSCLIPath, "~/.aws/", "Path for directory used by the aws CLI")
 	getCmd.Flags().BoolP(FlagURLOnly, "u", false, "Print only the URL to visit rather than a user-friendly message")
 	getCmd.Flags().BoolP(FlagNoBrowser, "b", false, "Do not open a browser window, printing the URL instead")
+	getCmd.Flags().StringP(FlagProfileName, "p", "", "The name of the awscli profile to save credentials. Only used if output type is awscli. Defaults to the account name.")
 }
 
 func resolveApplicationInfo(cfg *Config, bypassCache bool, nameOrID string) (*Account, bool) {
@@ -60,8 +62,8 @@ type GetCommand struct {
 	AccountIDOrName                                                           string
 	TimeToLive                                                                uint
 	TimeRemaining                                                             uint
-	OutputType, ShellType, RoleName, AWSCLIPath, OIDCDomain, ClientID, Region string
-	Login, URLOnly, NoBrowser, BypassCache, MachineOutput                     bool
+	OutputType, ShellType, RoleName, AWSCLIPath, OIDCDomain, ClientID, Region, ProfileName string
+	Login, URLOnly, NoBrowser, BypassCache, MachineOutput                                  bool
 
 	UsageFunc  func() error
 	PrintErrln func(...any)
@@ -81,6 +83,7 @@ func (g *GetCommand) Parse(cmd *cobra.Command, args []string) error {
 	g.URLOnly, _ = flags.GetBool(FlagURLOnly)
 	g.NoBrowser, _ = flags.GetBool(FlagNoBrowser)
 	g.BypassCache, _ = flags.GetBool(FlagBypassCache)
+	g.ProfileName, _ = flags.GetString(FlagProfileName)
 	g.Region, _ = flags.GetString(FlagRegion)
 	g.UsageFunc = cmd.Usage
 	g.PrintErrln = cmd.PrintErrln
@@ -164,7 +167,7 @@ func (g GetCommand) Execute(ctx context.Context, config *Config) error {
 	}
 
 	config.LastUsedAccount = &accountID
-	return echoCredentials(accountID, accountID, credentials, g.OutputType, g.ShellType, g.AWSCLIPath)
+	return echoCredentials(account, g.ProfileName, credentials, g.OutputType, g.ShellType, g.AWSCLIPath)
 }
 
 func (g GetCommand) fetchNewCredentials(ctx context.Context, account Account, cfg *Config) (*CloudCredentials, error) {
@@ -231,7 +234,7 @@ A role must be specified when using this command through the --role flag. You ma
 	},
 }
 
-func echoCredentials(id, name string, credentials CloudCredentials, outputType, shellType, cliPath string) error {
+func echoCredentials(account *Account, profileName string, credentials CloudCredentials, outputType, shellType, cliPath string) error {
 	switch outputType {
 	case outputTypeJSON:
 		buf, err := json.Marshal(credentials)
@@ -244,8 +247,7 @@ func echoCredentials(id, name string, credentials CloudCredentials, outputType, 
 		credentials.WriteFormat(os.Stdout, shellType)
 		return nil
 	case outputTypeAWSCredentialsFile:
-		acc := Account{ID: id, Name: name}
-		newCliEntry := NewCloudCliEntry(credentials, &acc)
+		newCliEntry := NewCloudCliEntry(credentials, account, profileName)
 		return SaveCloudCredentialInCLI(cliPath, newCliEntry)
 	default:
 		return fmt.Errorf("%s is an invalid output type", outputType)

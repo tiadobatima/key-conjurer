@@ -104,7 +104,7 @@ func (s SwitchCommand) Execute(ctx context.Context) error {
 		return nil
 	case outputTypeAWSCredentialsFile:
 		acc := Account{ID: s.AccountID, Name: s.AccountID}
-		newCliEntry := NewCloudCliEntry(creds, &acc)
+		newCliEntry := NewCloudCliEntry(creds, &acc, "")
 		return SaveCloudCredentialInCLI(s.AWSCLIPath, newCliEntry)
 	default:
 		return fmt.Errorf("%s is an invalid output type", s.OutputType)

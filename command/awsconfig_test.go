@@ -9,6 +9,53 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewCloudCliEntry(t *testing.T) {
+	creds := CloudCredentials{
+		AccessKeyID:     "test-key-id",
+		SecretAccessKey: "test-secret-key",
+		SessionToken:    "test-session-token",
+	}
+
+	tests := []struct {
+		name                string
+		account             *Account
+		profileName         string
+		expectedProfileName string
+	}{
+		{
+			name:                "uses account name when no alias or profile override",
+			account:             &Account{ID: "123", Name: "my-account"},
+			profileName:         "",
+			expectedProfileName: "my-account",
+		},
+		{
+			name:                "uses alias over account name",
+			account:             &Account{ID: "123", Name: "my-account", Alias: "my-alias"},
+			profileName:         "",
+			expectedProfileName: "my-alias",
+		},
+		{
+			name:                "profile override takes precedence over account name",
+			account:             &Account{ID: "123", Name: "my-account"},
+			profileName:         "custom-profile",
+			expectedProfileName: "custom-profile",
+		},
+		{
+			name:                "profile override takes precedence over alias",
+			account:             &Account{ID: "123", Name: "my-account", Alias: "my-alias"},
+			profileName:         "custom-profile",
+			expectedProfileName: "custom-profile",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entry := NewCloudCliEntry(creds, tt.account, tt.profileName)
+			assert.Equal(t, tt.expectedProfileName, entry.profileName)
+		})
+	}
+}
+
 func TestAddAWSCliEntry(t *testing.T) {
 	file, err := ini.Load(bytes.NewReader([]byte{}))
 	require.NoError(t, err)
