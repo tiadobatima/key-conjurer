@@ -90,7 +90,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var code string
-	if r.Err = authCodeReq.Verify(authCodeReq.state, &code); r.Err != nil {
+	if r.Err = authCodeReq.Verify(job.State, &code); r.Err != nil {
 		srvResponse(r.Err, w, req)
 		return
 	}

@@ -73,3 +73,39 @@ func Test_handler_YieldsCorrectlyFormattedState(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedToken, tok)
 }
+
+func Test_handler_RejectsAttackerControlledState(t *testing.T) {
+	var (
+		ex            testExchanger
+		handle        = &handler{Exchanger: &ex, jobs: make(chan job)}
+		expectedToken = &oauth2.Token{AccessToken: "attacker-token"}
+
+		serverState   = "SERVER_SECRET_STATE"
+		attackerState = "ATTACKER_DIFFERENT_STATE"
+		attackerCode  = "ATTACKER_CODE"
+		verifier      = oauth2.GenerateVerifier()
+
+		dl, _  = t.Deadline()
+		ctx, _ = context.WithDeadline(context.Background(), dl)
+
+		values = url.Values{
+			"state": []string{attackerState},
+			"code":  []string{attackerCode},
+		}
+		uri = url.URL{
+			Scheme:   "http",
+			Host:     "localhost",
+			Path:     "/oauth2/callback",
+			RawQuery: values.Encode(),
+		}
+		r = httptest.NewRequest("GET", uri.String(), nil)
+		w = httptest.NewRecorder()
+	)
+
+	ex.AddToken(attackerCode, expectedToken)
+
+	go handle.ServeHTTP(w, r)
+
+	_, err := handle.Wait(ctx, serverState, verifier)
+	assert.ErrorIs(t, err, ErrBadRequest, "server did not reject mismatched state")
+}
